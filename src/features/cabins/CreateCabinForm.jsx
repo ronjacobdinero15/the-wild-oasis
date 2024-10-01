@@ -1,5 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import toast from 'react-hot-toast'
+import { useForm } from 'react-hook-form'
 
 import Form from '../../ui/Form'
 import Input from '../../ui/Input'
@@ -7,49 +6,45 @@ import Button from '../../ui/Button'
 import FormRow from '../../ui/FormRow'
 import Textarea from '../../ui/Textarea'
 import FileInput from '../../ui/FileInput'
+import { useEditCabin } from './useEditCabin'
+import { useCreateCabin } from './useCreateCabin'
 
-import { useForm } from 'react-hook-form'
-import { createEditCabin } from '../../services/apiCabins'
+function CreateCabinForm({ cabinToEdit = {}, onCloseModal }) {
+  const { isCreating, createCabin } = useCreateCabin()
+  const { isEditing, editCabin } = useEditCabin()
+  const isWorking = isCreating || isEditing
 
-function CreateCabinForm({ cabinToEdit = {} }) {
   const { id: editId, ...editValues } = cabinToEdit
   const isEditSession = Boolean(editId)
 
-  const { register, handleSubmit, reset, getValues, formState } = useForm({
+  const { register, handleSubmit, reset, formState } = useForm({
     defaultValues: isEditSession ? editValues : {},
   })
   const { errors } = formState
-
-  const queryClient = useQueryClient()
-
-  const { mutate: createCabin, isLoading: isCreating } = useMutation({
-    mutationFn: createEditCabin,
-    onSuccess: () => {
-      toast.success('New cabin successfully created')
-      queryClient.invalidateQueries({ queryKey: ['cabins'] })
-      reset()
-    },
-    onError: err => toast.error(err.message),
-  })
-
-  const { mutate: editCabin, isLoading: isEditing } = useMutation({
-    mutationFn: ({ newCabinData, id }) => createEditCabin(newCabinData, id),
-    onSuccess: () => {
-      toast.success('Cabin successfully edited')
-      queryClient.invalidateQueries({ queryKey: ['cabins'] })
-      reset()
-    },
-    onError: err => toast.error(err.message),
-  })
-
-  const isWorking = isCreating || isEditing
 
   function onSubmit(data) {
     const image = typeof data.image === 'string' ? data.image : data.image[0]
 
     if (isEditSession)
-      editCabin({ newCabinData: { ...data, image }, id: editId })
-    else createCabin({ ...data, image: image })
+      editCabin(
+        { newCabinData: { ...data, image }, id: editId },
+        {
+          onSuccess: () => {
+            reset()
+            onCloseModal?.()
+          },
+        }
+      )
+    else
+      createCabin(
+        { ...data, image },
+        {
+          onSuccess: () => {
+            reset()
+            onCloseModal?.()
+          },
+        }
+      )
   }
 
   function onError(errors) {
@@ -57,7 +52,10 @@ function CreateCabinForm({ cabinToEdit = {} }) {
   }
 
   return (
-    <Form onSubmit={handleSubmit(onSubmit, onError)}>
+    <Form
+      onSubmit={handleSubmit(onSubmit, onError)}
+      type={onCloseModal ? 'modal' : 'regular'}
+    >
       <FormRow label="Cabin name" error={errors?.name?.message}>
         <Input
           type="text"
@@ -107,8 +105,8 @@ function CreateCabinForm({ cabinToEdit = {} }) {
           defaultValue={0}
           {...register('discount', {
             required: 'This field is required',
-            validate: value =>
-              +value <= +getValues().regularPrice ||
+            validate: (value, fieldValues) =>
+              +value <= +fieldValues.regularPrice ||
               'Discount should be less than the regular price',
           })}
         />
@@ -116,14 +114,12 @@ function CreateCabinForm({ cabinToEdit = {} }) {
 
       <FormRow
         label="Description for website"
-        disabled={isWorking}
         error={errors?.description?.message}
       >
         <Textarea
           type="number"
           id="description"
           disabled={isWorking}
-          defaultValue=""
           {...register('description', {
             required: 'This field is required',
           })}
@@ -142,7 +138,11 @@ function CreateCabinForm({ cabinToEdit = {} }) {
 
       <FormRow>
         {/* type is an HTML attribute! */}
-        <Button variation="secondary" type="reset">
+        <Button
+          variation="secondary"
+          type="reset"
+          onClick={() => onCloseModal?.()}
+        >
           Cancel
         </Button>
         <Button disabled={isWorking}>
