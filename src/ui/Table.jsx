@@ -7,7 +7,6 @@ const StyledTable = styled.div`
   font-size: 1.4rem;
   background-color: var(--color-grey-0);
   border-radius: 7px;
-  overflow: hidden;
 `
 
 const CommonRow = styled.div`
@@ -95,6 +94,7 @@ function Body({ data, render }) {
 
   return <StyledBody>{data.map(render)}</StyledBody>
 }
+
 Table.Header = Header
 Table.Row = Row
 Table.Body = Body
